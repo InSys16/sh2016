@@ -16,11 +16,43 @@ import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.mutable.ArrayBuffer
 
-case class PairWithCommonFriends(person1: Int, person2: Int, commonFriendsCount: Int)
-case class UserFriends(user: Int, friends: Array[Int])
-case class AgeSex(age: Int, sex: Int)
+case class PairWithCommonFriends(
+            user1: Int,
+            user2: Int,
+            commonFriendsCount: Int,
+            typeOfConnection: Int)
+
+case class GraphFriend(uid: Int, mask: Int)//, interactionScore: Double = 0f)
+case class UserFriends(uid: Int, friends: Array[GraphFriend])
+case class AgeGenderPosition(age: Int, gender: Int, position : Int)
 
 object Baseline {
+
+  def getTypeOfConnection(id : Int) = id match {
+    case 1 => 0
+    case 2
+
+    1. Love
+      2. Spouse
+      3. Parent
+      4. Child
+      5. Brother/Sister
+      6. Uncle/Aunt
+      7. Relative
+      8. Close friend
+    9. Colleague
+      10. Schoolmate
+      11. Nephew
+      12. Grandparent
+      13. Grandchild
+      14. College/University fellow
+    15. Army fellow
+    16. Parent in law
+      17. Child in law
+      18. Godparent
+      19. Godchild
+      20. Playing together
+  }
 
   def main(args: Array[String]) {
 
@@ -33,18 +65,22 @@ object Baseline {
 
     val dataDir = if (args.length == 1) args(0) else "./"
 
+    //val dataDir = "D:\\SNAHackaton2016\\"
     val graphPath = dataDir + "trainGraph"
     val reversedGraphPath = dataDir + "trainSubReversedGraph"
     val commonFriendsPath = dataDir + "commonFriendsCountsPartitioned"
     val demographyPath = dataDir + "demography"
-    val predictionPath = dataDir + "prediction"
-    val modelPath = dataDir + "LogisticRegressionModel"
+    val predictionPath = dataDir + "ModifiedPredictionForAge"
+    val modelPath = dataDir + "ModifiedLogisticRegressionModelForAge"
     val numPartitions = 200
     val numPartitionsGraph = 107
 
     // read graph, flat and reverse it
     // step 1.a from description
 
+    /**
+      * list of [User * Friends[]]
+      */
     val graph = {
       sc.textFile(graphPath)
         .map(line => {
@@ -55,22 +91,30 @@ object Baseline {
               .replace("{(", "")
               .replace(")}", "")
               .split("\\),\\(")
-              .map(t => t.split(",")(0).toInt)
+              .map(t => GraphFriend(t.split(",")(0).toInt, t.split(",")(1).toInt))
           }
           UserFriends(user, friends)
         })
     }
 
     graph
-      .filter(userFriends => userFriends.friends.length >= 8 && userFriends.friends.length <= 1000)
-      .flatMap(userFriends => userFriends.friends.map(x => (x, userFriends.user)))
+      .filter(user => user.friends.length >= 8 && user.friends.length <= 1000)
+      .flatMap(user => user.friends.map(x => (x.uid, GraphFriend(user.uid, x.mask))))
       .groupByKey(numPartitions)
-      .map(t => UserFriends(t._1, t._2.toArray))
-      .map(userFriends => userFriends.friends.sorted)
-      .filter(friends => friends.length >= 2 && friends.length <= 2000)
-      .map(friends => new Tuple1(friends))
+      .map(t => UserFriends(t._1, t._2.toArray.sortWith(_.uid < _.uid)))
+      .filter(userFriends => userFriends.friends.length >= 2 && userFriends.friends.length <= 2000)
       .toDF
       .write.parquet(reversedGraphPath)
+
+      //.filter(userFriends => userFriends.friends.length >= 8 && userFriends.friends.length <= 1000)
+      //.flatMap(userFriends => userFriends.friends.map(x => (x, userFriends.user)))
+      //.groupByKey(numPartitions)
+      //.map(t => UserFriends(t._1, t._2.toArray))
+      //.map(userFriends => userFriends.friends.sorted)
+      //.filter(friends => friends.length >= 2 && friends.length <= 2000)
+      //.map(friends => new Tuple1(friends))
+      //.toDF
+      //.write.parquet(reversedGraphPath)
 
     // for each pair of ppl count the amount of their common friends
     // amount of shared friends for pair (A, B) and for pair (B, A) is the same
@@ -89,9 +133,11 @@ object Baseline {
       pairs
     }
 
+    val reversedGraph = sqlc.read.parquet(reversedGraphPath)
+
     for (k <- 0 until numPartitionsGraph) {
       val commonFriendsCounts = {
-        sqlc.read.parquet(reversedGraphPath)
+        reversedGraph
           .map(t => generatePairs(t.getAs[Seq[Int]](0), numPartitionsGraph, k))
           .flatMap(pair => pair.map(x => x -> 1))
           .reduceByKey((x, y) => x + y)
@@ -111,52 +157,56 @@ object Baseline {
         .map(t => PairWithCommonFriends(t.getAs[Int](0), t.getAs[Int](1), t.getAs[Int](2)))
     }
 
-
     // step 3
-    val usersBC = sc.broadcast(graph.map(userFriends => userFriends.user).collect().toSet)
+    val usersBroadcastSet = sc.broadcast(graph.map(userFriends => userFriends.user).collect().toSet)
 
+    /**
+      * pairs (user * friend) and prob = 1
+      */
     val positives = {
       graph
         .flatMap(
           userFriends => userFriends.friends
-            .filter(x => (usersBC.value.contains(x) && x > userFriends.user))
+            //take friends that in Set and > user(remove duplicates)
+            .filter(x => usersBroadcastSet.value.contains(x) && x > userFriends.user)
             .map(x => (userFriends.user, x) -> 1.0)
         )
     }
 
     // step 4
-    val ageSex = {
+    val userToAgeSex = {
       sc.textFile(demographyPath)
-        .map(line => {
+        .map(line => { // 0userId 1create_date 2birth_date 3gender 4ID_country 5ID_Location 6loginRegion
           val lineSplit = line.trim().split("\t")
           if (lineSplit(2) == "") {
-            (lineSplit(0).toInt -> AgeSex(0, lineSplit(3).toInt))
+            lineSplit(0).toInt -> AgeGenderPosition(0, lineSplit(3).toInt, lineSplit(5).toInt)
           }
           else {
-            (lineSplit(0).toInt -> AgeSex(lineSplit(2).toInt, lineSplit(3).toInt))
+            lineSplit(0).toInt -> AgeGenderPosition(lineSplit(2).toInt, lineSplit(3).toInt, lineSplit(5).toInt)
           }
         })
     }
 
-    val ageSexBC = sc.broadcast(ageSex.collectAsMap())
+    val userToAgeSexBC = sc.broadcast(userToAgeSex.collectAsMap())
 
-    // step 5
-    def prepareData(
-                     commonFriendsCounts: RDD[PairWithCommonFriends],
-                     positives: RDD[((Int, Int), Double)],
-                     ageSexBC: Broadcast[scala.collection.Map[Int, AgeSex]]) = {
+    val userToFriendsCount = graph.map(uf => uf.user -> uf.friends.length)
+    val userToFriendsCountBC = sc.broadcast(userToFriendsCount.collectAsMap())
 
+
+
+    def prepareData( commonFriendsCounts: RDD[PairWithCommonFriends],
+                     pairsWithProb: RDD[((Int, Int), Double)],
+                     userToAgeSexBC: Broadcast[scala.collection.Map[Int, AgeGenderPosition]]) = {
       commonFriendsCounts
-        .map(pair => (pair.person1, pair.person2) -> (Vectors.dense(
-          pair.commonFriendsCount.toDouble,
-          abs(ageSexBC.value.getOrElse(pair.person1, AgeSex(0, 0)).age - ageSexBC.value.getOrElse(pair.person2, AgeSex(0, 0)).age).toDouble,
-          if (ageSexBC.value.getOrElse(pair.person1, AgeSex(0, 0)).sex == ageSexBC.value.getOrElse(pair.person2, AgeSex(0, 0)).sex) 1.0 else 0.0))
-        )
-        .leftOuterJoin(positives)
+        .map(pair => FeatureExtractor.getFeatures(pair))
+        .leftOuterJoin(pairsWithProb)
     }
 
+    /**
+      * list of points (prob * vector)
+      */
     val data = {
-      prepareData(commonFriendsCounts, positives, ageSexBC)
+      prepareData(commonFriendsCounts, positives, userToAgeSexBC)
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
     }
 
@@ -201,7 +251,7 @@ object Baseline {
     }
 
     val testData = {
-      prepareData(testCommonFriendsCounts, positives, ageSexBC)
+      prepareData(testCommonFriendsCounts, positives, userToAgeSexBC)
         .map(t => t._1 -> LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
         .filter(t => t._2.label == 0.0)
     }
