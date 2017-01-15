@@ -39,7 +39,7 @@ object Baseline {
 
     //val dataDir = "D:\\SNAHackaton2016\\"
     val graphPath = dataDir + "trainGraph"
-    val reversedGraphPath = dataDir + "trainSubReversedGraph"
+    val reversedGraphPath = dataDir + "reversedGraph"
     val pairsPath = dataDir + "pairs"
     val demographyPath = dataDir + "demography"
     val predictionPath = dataDir + "Prediction"
@@ -130,7 +130,17 @@ object Baseline {
           .map(p => Pair(p._1._1, p._1._2, p._2))
       }
 
-      IO.writePairs(pairs, pairsPath + "/part_" + part)
+      pairs.map(pair => {(
+        pair.uid1,
+        pair.uid2,
+        pair.features.commonFriendScoreOK,
+        pair.features.commonFriendsCount,
+        pair.features.groupScores.commonRelatives,
+        pair.features.groupScores.commonColleagues,
+        pair.features.groupScores.commonSchoolmates,
+        pair.features.groupScores.commonArmyFellows,
+        pair.features.groupScores.commonFriends)    })
+        .toDF.repartition(4).write.parquet(pairsPath + "/part_" + part)
     }
     val pairs = IO.readPairs(sqlc, pairsPath + "/part_33")
 
