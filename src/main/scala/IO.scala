@@ -17,23 +17,6 @@ import scala.collection.mutable.ArrayBuffer
   */
 object IO {
 
-  def writePairs(pairs : RDD[Pair],
-                 path : String) =
-  {
-    pairs.map(pair => {
-      pair.uid1,
-      pair.uid2,
-      pair.features.commonFriendScoreOK,
-      pair.features.commonFriendsCount,
-      pair.features.groupScores.commonRelatives,
-      pair.features.groupScores.commonColleagues,
-      pair.features.groupScores.commonSchoolmates,
-      pair.features.groupScores.commonArmyFellows,
-      pair.features.groupScores.commonFriends
-    })
-      .toDF.repartition(4).write.parquet(path)
-  }
-
   def readPairs(sqlc: SQLContext,
                 path : String) =
   {
