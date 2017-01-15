@@ -72,7 +72,7 @@ object Baseline {
 
     val coreUsers = graph.map(user => user.uid)
     val coreUsersBC = sc.broadcast(coreUsers.collect().toSet)
-
+    /*
     graph
       .filter(user => user.friends.length >= 8 && user.friends.length <= 1000)
       .flatMap(user => user.friends.map(x => (x.uid, GraphFriend(user.uid, x.group))))
@@ -82,7 +82,7 @@ object Baseline {
         .sortWith(_.uid < _.uid)))
       .filter(userFriends => userFriends.friends.length >= 2 && userFriends.friends.length <= 2000)
       .toDF.write.parquet(reversedGraphPath)
-
+    */
     val reversedGraph = IO.readReversedGraph(sqlc, reversedGraphPath)
 
     val mainUsersFriendsCount = graph.map(user => user.uid -> user.friends.length)
@@ -126,6 +126,7 @@ object Baseline {
           //.filter(pair => pair.commonFriendsCount > 8)
           .flatMap(t => generatePairs(t, part, coreUsersBC, /*pageRanks,*/ friendsCountBC))
           .reduceByKey((features1, features2) => FeatureHelper.sumFeatures(features1, features2))
+          .filter(pair => pair._2.commonFriendsCount > 8)
           .map(p => Pair(p._1._1, p._1._2, p._2))
       }
 
@@ -209,7 +210,7 @@ object Baseline {
         Seq(id._1 -> (id._2, prediction), id._2 -> (id._1, prediction))
       }
       .filter(t => t._1 % 11 == 7 && t._2._2 >= threshold)
-      .groupByKey(numPairsParts)
+      .groupByKey(numGraphParts)
 
       .map(t => {
         val user = t._1
