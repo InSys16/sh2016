@@ -1,6 +1,7 @@
 import breeze.numerics.abs
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.broadcast.Broadcast
+import scala.collection.Map
 
 /**
   * Created by art on 14.01.17.
@@ -16,32 +17,40 @@ object FeatureExtractor {
     if (x == 0) 0.0 else c.toDouble / x.toDouble
   }
 
-  def getFeatures(pair: PairWithCommonFriends,
-                  userToAgeSexBC: Broadcast[Map[Int, AgeGenderPosition]],
-                  userToFriendsCountBC: Broadcast[Map[Int, Int]]) = {
-    val firstAGP = userToAgeSexBC.value.getOrElse(pair.person1, AgeGenderPosition(0, 0, 0))
-    val secondAGP = userToAgeSexBC.value.getOrElse(pair.person2, AgeGenderPosition(0, 0, 0))
-    val firstFriendsCount = userToFriendsCountBC.value.getOrElse(pair.person1, 0)
-    val secondFriendsCount = userToFriendsCountBC.value.getOrElse(pair.person2, 0)
-    val jaccard = countJaccard(firstFriendsCount, secondFriendsCount, pair.commonFriendsCount)
-    val cosine  = countCosine(firstFriendsCount, secondFriendsCount, pair.commonFriendsCount)
-    val sameGender = if (firstAGP.gender == secondAGP.gender) 1.0 else 0.0
+  def getFeatures(pair: Pair,
+                  demographyBC: Broadcast[Map[Int, Demography]],
+                  friendsCountBC: Broadcast[Map[Int, Int]]) = {
+    val demography = demographyBC.value
+    val friendsCount = friendsCountBC.value
+    val features = pair.features
+    val groupFeatures = pair.features.groupScores
+
+    val firstDemography = demography.getOrElse(pair.uid1, Demography(0, 0, 0))
+    val secondDemography = demography.getOrElse(pair.uid2, Demography(0, 0, 0))
+    val firstFriendsCount = friendsCount.getOrElse(pair.uid1, 0)
+    val secondFriendsCount = friendsCount.getOrElse(pair.uid2, 0)
+    val jaccard = countJaccard(firstFriendsCount, secondFriendsCount, features.commonFriendsCount)
+    val cosine  = countCosine(firstFriendsCount, secondFriendsCount, features.commonFriendsCount)
+    val sameGender = if (firstDemography.gender == secondDemography.gender) 1.0 else 0.0
     val ageDiff = {
-      val ageDiff = abs(firstAGP.age - secondAGP.age).toDouble
+      val ageDiff = abs(firstDemography.age - secondDemography.age).toDouble
       //1/scala.math.pow(2,ageDiff)
       ageDiff
     }
-    val samePosition = if ((firstAGP.position == secondAGP.position) && (firstAGP.position != 0)) 1.0 else 0.0
+    val samePosition = if ((firstDemography.position == secondDemography.position) && (firstDemography.position != 0)) 1.0 else 0.0
 
-
-
-    (pair.person1, pair.person2) -> Vectors.dense(
+    (pair.uid1, pair.uid2) -> Vectors.dense(
       cosine,
       jaccard,
       ageDiff,
       sameGender,
-      samePosition
-    )
+      samePosition,
+      features.commonFriendScoreOK,
+      groupFeatures.commonRelatives,
+      groupFeatures.commonColleagues,
+      groupFeatures.commonSchoolmates,
+      groupFeatures.commonArmyFellows,
+      groupFeatures.commonFriends)
 
   }
 }
