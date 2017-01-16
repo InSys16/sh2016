@@ -46,11 +46,11 @@ object FeatureExtractor {
       sameGender,
       samePosition,
       features.commonFriendScoreOK,
-      groupFeatures.commonRelatives,
-      groupFeatures.commonColleagues,
-      groupFeatures.commonSchoolmates,
-      groupFeatures.commonArmyFellows,
-      groupFeatures.commonFriends)
+      groupFeatures.commonRelatives.toDouble,
+      groupFeatures.commonColleagues.toDouble,
+      groupFeatures.commonSchoolmates.toDouble,
+      groupFeatures.commonArmyFellows.toDouble,
+      groupFeatures.commonFriends.toDouble)
 
   }
 }

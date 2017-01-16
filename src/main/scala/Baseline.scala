@@ -115,7 +115,7 @@ object Baseline {
       }
       pairs
     }
-
+    /*
     for (part <- 0 until numPairsParts) {
       val pairs = {
         reversedGraph
@@ -142,12 +142,15 @@ object Baseline {
         pair.features.groupScores.commonFriends)    })
         .toDF.repartition(4).write.parquet(pairsPath + "/part_" + part)
     }
+    */
     val pairs = IO.readPairs(sqlc, pairsPath + "/part_33")
 
+    /// (coreUser1,  coreUser2) -> 1.0  :  coreUser1 < coreUser2
+    /// I.e. realFriends
     val positives = graph.flatMap(
           userFriends => userFriends.friends
-            //take friends that in Set and > user(remove duplicates)
-            .filter(x => coreUsersBC.value.contains(x.uid) && x.uid > userFriends.uid)
+            //take friends that in coreUsersSet and > user
+            .filter(x => coreUsersBC.value.contains(x.uid) && userFriends.uid < x.uid)
             .map(x => (userFriends.uid, x.uid) -> 1.0)
         )
 
@@ -165,8 +168,7 @@ object Baseline {
     }
     val demographyBC = sc.broadcast(demography.collectAsMap())
 
-    def prepareData( pairs: RDD[Pair],
-                     positives: RDD[((Int, Int), Double)]) = {
+    def prepareData( pairs: RDD[Pair], positives: RDD[((Int, Int), Double)]) = {
       pairs
         .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC))
         .leftOuterJoin(positives)
@@ -205,7 +207,6 @@ object Baseline {
     println("model ROC = " + rocLogReg.toString)
 
     // compute scores on the test set
-    // step 7
     val testCommonFriendsCounts = {
       IO.readPairs(sqlc, pairsPath + "/part_*/")
         .filter(pair => pair.uid1 % 11 == 7 || pair.uid2 % 11 == 7)
