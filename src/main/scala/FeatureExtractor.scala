@@ -46,6 +46,7 @@ object FeatureExtractor {
       sameGender,
       samePosition,
       features.commonFriendScoreOK,
+      features.commonFriendsCount.toDouble,
       groupFeatures.commonRelatives.toDouble,
       groupFeatures.commonColleagues.toDouble,
       groupFeatures.commonSchoolmates.toDouble,
