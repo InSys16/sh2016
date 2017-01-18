@@ -37,7 +37,7 @@ object IO {
               adamicAdar,
               commonFriendsCount,
               fedorScore,
-              pageRank,
+              //pageRank,
               GroupScores(commonRelatives,
                           commonColleagues,
                           commonSchoolmates,

@@ -54,7 +54,7 @@ object FeatureExtractor {
       features.adamicAdar,
       features.commonFriendsCount.toDouble,
       features.fedorScore,
-      features.pageRank,
+      //features.pageRank,
       groupFeatures.commonRelatives.toDouble,
       groupFeatures.commonColleagues.toDouble,
       groupFeatures.commonSchoolmates.toDouble,
