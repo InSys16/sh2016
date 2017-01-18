@@ -17,6 +17,9 @@ import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.{Row, SQLContext}
+import org.apache.spark.graphx
+import org.apache.spark.graphx.{Edge, Graph}
+import org.apache.spark.graphx.lib.PageRank
 
 import scala.collection.Map
 import scala.collection.mutable.ArrayBuffer
@@ -47,7 +50,9 @@ object Baseline {
     val pairsPath = dataDir + "pairs"
     val demographyPath = dataDir + "demography"
     val predictionPath = dataDir + "Prediction"
-    val modelPath = dataDir + "Model"
+    val modelPath = dataDir + "LogisticRegressionModel"
+    val pageRankPath = dataDir + "PageRank"
+    val regionProximityPath = dataDir + "RegionProximity"
     val numGraphParts = 200
     val numPairsParts = 107
 
@@ -73,7 +78,72 @@ object Baseline {
           UserFriends(user, friends)
         })
     }
+    val demography = {
+      sc.textFile(demographyPath)
+        .map(line => { // 0userId 1create_date 2birth_date 3gender 4ID_country 5ID_Location 6loginRegion
+        val lineSplit = line.trim().split("\t")
+          if (lineSplit(2) == "") {
+            lineSplit(0).toInt -> Demography(0, lineSplit(3).toInt, lineSplit(5).toInt)
+          }
+          else {
+            lineSplit(0).toInt -> Demography(lineSplit(2).toInt, lineSplit(3).toInt, lineSplit(5).toInt)
+          }
+        })
+    }
+    val demographyBC = sc.broadcast(demography.collectAsMap())
 
+    def calculateRegionsProximity() = {
+      val x =
+        graph
+          .flatMap(uf => {
+            val userRegion = demographyBC.value.getOrElse(uf.uid, Demography(0, 0, 0)).position
+            uf.friends
+              .map(fr => {
+                val friendRegion = demographyBC.value.getOrElse(fr.uid, Demography(0, 0, 0)).position
+                if (userRegion < friendRegion)
+                  (userRegion, friendRegion)
+                else
+                  (friendRegion, userRegion)
+              })
+          }).groupBy(w => w)
+            .map(x => (x._1._1, x._1._2, x._2.size))
+            .toDF().write.parquet(regionProximityPath)
+
+    }
+
+    def loadRegionsProximity() = {
+      sqlc.read
+        .parquet(regionProximityPath)
+        .map{case Row(f1: Int, f2: Int, prox : Int) => (f1,f2) -> prox}
+        .collectAsMap()
+    }
+
+    calculateRegionsProximity()
+    val regionsProximityBC = sc.broadcast(loadRegionsProximity())
+
+    def calculatePageRank() = {
+      val edges = graph.flatMap(userFriends => userFriends.friends.map(fr => Edge(userFriends.uid, fr.uid, 1)))
+      val graphForPageRank = Graph.fromEdges(edges, 1)
+      val pageRank =
+        PageRank.run(graphForPageRank, 5)
+          .vertices
+        .map(vert => (vert._1.toInt, vert._2))
+      val maxPageRank = pageRank.map(pair => pair._2).max()
+      val normalized =
+        pageRank.map(pair => (pair._1.toInt, pair._2 / maxPageRank))
+      val x = normalized.toDF().write.parquet(pageRankPath)
+    }
+
+    def loadPageRank() = {
+      sqlc.read
+        .parquet(pageRankPath)
+        .map{case Row(k: Int, v: Double) => k -> v}
+        .collectAsMap()
+    }
+
+    calculatePageRank()
+
+    val pageRankBC = sc.broadcast(loadPageRank())
     val coreUsers = graph.map(user => user.uid)
     val coreUsersBC = sc.broadcast(coreUsers.collect().toSet)
     /*
@@ -93,7 +163,7 @@ object Baseline {
     val otherUsersFriendsCount = reversedGraph.map(user => user.uid -> user.friends.length)
     val friendsCount = mainUsersFriendsCount.union(otherUsersFriendsCount)
     val friendsCountBC = sc.broadcast(friendsCount.collectAsMap())
-    /*
+
     def generatePairs(userFriends: UserFriends,
                       numOfPart: Int,
                       coreUsers: Broadcast[Set[Int]],
@@ -101,17 +171,19 @@ object Baseline {
       val pairs = ArrayBuffer.empty[((Int, Int), Features)]
 
       val commonFriendFriendsCount = friendsCount.value.getOrElse(userFriends.uid, 0)
-      val commonFriendScore = if (commonFriendFriendsCount >= 2) 1.0 / Math.log(commonFriendFriendsCount.toDouble) else 1.0
-      val fedorScore = 100.0 / Math.pow(commonFriendFriendsCount.toDouble + 10, 1.0/3.0) - 6
+      val commonFriendAdamicAdar = if (commonFriendFriendsCount >= 2) 1.0 / Math.log(commonFriendFriendsCount.toDouble) else 1.0
+      val commonUserPageRank = pageRankBC.value.getOrElse(userFriends.uid, 0.0)
+      val fedorScore = 100.0 / Math.pow(commonFriendFriendsCount.toDouble + 5, 1.0/3.0) - 8
 
       for (i <- userFriends.friends.indices) {
         val user1 = userFriends.friends(i)
         if (user1.uid % numPairsParts == numOfPart) {
           for (j <- i + 1 until userFriends.friends.length) {
             val user2 = userFriends.friends(j)
-            val features = Features(commonFriendScore,
+            val features = Features(commonFriendAdamicAdar,
               1,
               fedorScore,
+              commonUserPageRank,
               GroupDefiner.getGroupsScoresByCommonFriendGroups(user1.group, user2.group))
 
             pairs.append(((user1.uid, user2.uid), features))
@@ -136,6 +208,7 @@ object Baseline {
         pair.features.adamicAdar,
         pair.features.commonFriendsCount,
         pair.features.fedorScore,
+        pair.features.pageRank,
         pair.features.groupScores.commonRelatives,
         pair.features.groupScores.commonColleagues,
         pair.features.groupScores.commonSchoolmates,
@@ -143,7 +216,7 @@ object Baseline {
         pair.features.groupScores.commonFriends)    })
         .toDF.repartition(4).write.parquet(pairsPath + "/part_" + part)
     }
-    */
+
 
     //val pairs = IO.readPairs(sqlc, pairsPath + "/part_*/")
     /*
@@ -194,26 +267,11 @@ object Baseline {
             .map(x => (userFriends.uid, x.uid) -> 1.0)
         )
 
-    val demography = {
-      sc.textFile(demographyPath)
-        .map(line => { // 0userId 1create_date 2birth_date 3gender 4ID_country 5ID_Location 6loginRegion
-          val lineSplit = line.trim().split("\t")
-          if (lineSplit(2) == "") {
-            lineSplit(0).toInt -> Demography(0, lineSplit(3).toInt, lineSplit(5).toInt)
-          }
-          else {
-            lineSplit(0).toInt -> Demography(lineSplit(2).toInt, lineSplit(3).toInt, lineSplit(5).toInt)
-          }
-        })
-    }
-    val demographyBC = sc.broadcast(demography.collectAsMap())
-
-
     val pairsForLearning = IO.readPairs(sqlc, pairsPath + "/part_33")
 
     def prepareData( pairs: RDD[Pair], positives: RDD[((Int, Int), Double)]) = {
       pairs
-        .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC))
+        .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))
         .leftOuterJoin(positives)
     }
 
@@ -221,7 +279,6 @@ object Baseline {
       prepareData(pairsForLearning, positives)
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
     }
-
 
     val splits = dataForLearning.randomSplit(Array(0.2, 0.8), seed = 11L)
     //val trainingData = splits(0).cache()
@@ -237,7 +294,7 @@ object Baseline {
         .run(trainingData)
     }
 
-    // try to use с
+    // try to use RandomForest
 
     val treeStrategy = Strategy.defaultStrategy("Classification")
     val numTrees = 100 // Use more in practice.
@@ -261,10 +318,6 @@ object Baseline {
         (prediction, label)
       }
     }
-
-
-
-
 
     // estimate model quality
     @transient val metricsLogReg = new BinaryClassificationMetrics(predictionAndLabels, 100)

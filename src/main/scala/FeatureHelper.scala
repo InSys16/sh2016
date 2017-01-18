@@ -4,6 +4,7 @@
 case class Features(adamicAdar: Double,
                     commonFriendsCount: Int,
                     fedorScore : Double,
+                    pageRank : Double,
                     groupScores: GroupScores)
 object FeatureHelper {
 
@@ -13,6 +14,7 @@ object FeatureHelper {
       features1.adamicAdar + features2.adamicAdar,
       features1.commonFriendsCount + features2.commonFriendsCount,
       features1.fedorScore + features2.fedorScore,
+      features1.pageRank + features2.pageRank,
       GroupDefiner.sumGroupScores(features1.groupScores, features2.groupScores)
       )
   }
