@@ -118,14 +118,14 @@ object Baseline {
         .collectAsMap()
     }
 
-    calculateRegionsProximity()
+    //calculateRegionsProximity()
     val regionsProximityBC = sc.broadcast(loadRegionsProximity())
 
     def calculatePageRank() = {
       val edges = graph.flatMap(userFriends => userFriends.friends.map(fr => Edge(userFriends.uid, fr.uid, 1)))
       val graphForPageRank = Graph.fromEdges(edges, 1)
       val pageRank =
-        PageRank.run(graphForPageRank, 5)
+        graphForPageRank.pageRank(5)
           .vertices
         .map(vert => (vert._1.toInt, vert._2))
       val maxPageRank = pageRank.map(pair => pair._2).max()
@@ -141,9 +141,9 @@ object Baseline {
         .collectAsMap()
     }
 
-    calculatePageRank()
+    //calculatePageRank()
 
-    val pageRankBC = sc.broadcast(loadPageRank())
+    //val pageRankBC = sc.broadcast(loadPageRank())
     val coreUsers = graph.map(user => user.uid)
     val coreUsersBC = sc.broadcast(coreUsers.collect().toSet)
     /*
@@ -172,7 +172,7 @@ object Baseline {
 
       val commonFriendFriendsCount = friendsCount.value.getOrElse(userFriends.uid, 0)
       val commonFriendAdamicAdar = if (commonFriendFriendsCount >= 2) 1.0 / Math.log(commonFriendFriendsCount.toDouble) else 1.0
-      val commonUserPageRank = pageRankBC.value.getOrElse(userFriends.uid, 0.0)
+      //val commonUserPageRank = pageRankBC.value.getOrElse(userFriends.uid, 0.0)
       val fedorScore = 100.0 / Math.pow(commonFriendFriendsCount.toDouble + 5, 1.0/3.0) - 8
 
       for (i <- userFriends.friends.indices) {
@@ -183,7 +183,7 @@ object Baseline {
             val features = Features(commonFriendAdamicAdar,
               1,
               fedorScore,
-              commonUserPageRank,
+              //commonUserPageRank,
               GroupDefiner.getGroupsScoresByCommonFriendGroups(user1.group, user2.group))
 
             pairs.append(((user1.uid, user2.uid), features))
@@ -192,7 +192,7 @@ object Baseline {
       }
       pairs
     }
-
+    /*
     for (part <- 0 until numPairsParts) {
       val pairs = {
         reversedGraph
@@ -208,7 +208,7 @@ object Baseline {
         pair.features.adamicAdar,
         pair.features.commonFriendsCount,
         pair.features.fedorScore,
-        pair.features.pageRank,
+        //pair.features.pageRank,
         pair.features.groupScores.commonRelatives,
         pair.features.groupScores.commonColleagues,
         pair.features.groupScores.commonSchoolmates,
@@ -216,7 +216,7 @@ object Baseline {
         pair.features.groupScores.commonFriends)    })
         .toDF.repartition(4).write.parquet(pairsPath + "/part_" + part)
     }
-
+    */
 
     //val pairs = IO.readPairs(sqlc, pairsPath + "/part_*/")
     /*
