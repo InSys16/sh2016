@@ -281,21 +281,18 @@ object Baseline {
     }
 
     val splits = dataForLearning.randomSplit(Array(0.2, 0.8), seed = 11L)
-    //val trainingData = splits(0).cache()
+    val trainingData = splits(0).cache()
     val validationData = splits(1)
 
     // run training algorithm to build the model
-    /*
     val model = {
-
-      //new RandomForestClassificationModel()
       new LogisticRegressionWithLBFGS()
         .setNumClasses(2)
         .run(trainingData)
     }
 
     // try to use RandomForest
-
+    /*
     val treeStrategy = Strategy.defaultStrategy("Classification")
     val numTrees = 100 // Use more in practice.
     val featureSubsetStrategy = "auto"
@@ -308,10 +305,10 @@ object Baseline {
       if (point.label == prediction) 1.0 else 0.0
     }//.mean()
     */
-    val model = RandomForestModel.load(sc, modelPath)
-    //model.clearThreshold()
+    //val model = RandomForestModel.load(sc, modelPath)
+    model.clearThreshold()
 
-      //model.save(sc, modelPath)
+    model.save(sc, modelPath)
     val predictionAndLabels = {
       validationData.map { case LabeledPoint(label, features) =>
         val prediction = model.predict(features)
