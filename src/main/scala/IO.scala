@@ -24,16 +24,18 @@ object IO {
         .map{
           case Row(uid1: Int,
                    uid2: Int,
-                   commonFriendScoreOK : Double,
+                   adamicAdar : Double,
                    commonFriendsCount : Int,
+                   fedorScore : Double,
                    commonRelatives: Int,
                    commonColleagues: Int,
                    commonSchoolmates: Int,
                    commonArmyFellows: Int,
                    commonFriends: Int ) =>
             Pair(uid1, uid2, Features(
-              commonFriendScoreOK,
+              adamicAdar,
               commonFriendsCount,
+              fedorScore,
               GroupScores(commonRelatives,
                           commonColleagues,
                           commonSchoolmates,

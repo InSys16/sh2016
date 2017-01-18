@@ -2,10 +2,14 @@
   * Baseline for hackaton
   */
 
-
+import org.apache.spark.mllib.tree.configuration.Strategy
+import org.apache.spark.mllib.tree.RandomForest
+import org.apache.spark.mllib.tree.model.RandomForestModel
+import org.apache.spark.mllib.util.MLUtils
 import breeze.numerics.abs
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.ml.classification.RandomForestClassificationModel
 import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
 import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
 import org.apache.spark.mllib.linalg.Vectors
@@ -43,7 +47,7 @@ object Baseline {
     val pairsPath = dataDir + "pairs"
     val demographyPath = dataDir + "demography"
     val predictionPath = dataDir + "Prediction"
-    val modelPath = dataDir + "LogisticRegressionModel"
+    val modelPath = dataDir + "Model"
     val numGraphParts = 200
     val numPairsParts = 107
 
@@ -89,16 +93,16 @@ object Baseline {
     val otherUsersFriendsCount = reversedGraph.map(user => user.uid -> user.friends.length)
     val friendsCount = mainUsersFriendsCount.union(otherUsersFriendsCount)
     val friendsCountBC = sc.broadcast(friendsCount.collectAsMap())
-
+    /*
     def generatePairs(userFriends: UserFriends,
                       numOfPart: Int,
                       coreUsers: Broadcast[Set[Int]],
-                      //pageRanks: Broadcast[Map[Int, Double]],
                       friendsCount: Broadcast[Map[Int, Int]]) = {
       val pairs = ArrayBuffer.empty[((Int, Int), Features)]
 
       val commonFriendFriendsCount = friendsCount.value.getOrElse(userFriends.uid, 0)
       val commonFriendScore = if (commonFriendFriendsCount >= 2) 1.0 / Math.log(commonFriendFriendsCount.toDouble) else 1.0
+      val fedorScore = 100.0 / Math.pow(commonFriendFriendsCount.toDouble + 10, 1.0/3.0) - 6
 
       for (i <- userFriends.friends.indices) {
         val user1 = userFriends.friends(i)
@@ -107,6 +111,7 @@ object Baseline {
             val user2 = userFriends.friends(j)
             val features = Features(commonFriendScore,
               1,
+              fedorScore,
               GroupDefiner.getGroupsScoresByCommonFriendGroups(user1.group, user2.group))
 
             pairs.append(((user1.uid, user2.uid), features))
@@ -115,16 +120,11 @@ object Baseline {
       }
       pairs
     }
-    /*
+
     for (part <- 0 until numPairsParts) {
       val pairs = {
         reversedGraph
-          //.map(t => generatePairs(re, numPartitionsGraph, k))
-          //.flatMap(pair => pair.map(x => x -> 1))
-          //.reduceByKey((x, y) => x + y)
-          //.map(t => PairWithCommonFriends(t._1._1, t._1._2, t._2))
-          //.filter(pair => pair.commonFriendsCount > 8)
-          .flatMap(t => generatePairs(t, part, coreUsersBC, /*pageRanks,*/ friendsCountBC))
+          .flatMap(t => generatePairs(t, part, coreUsersBC, friendsCountBC))
           .reduceByKey((features1, features2) => FeatureHelper.sumFeatures(features1, features2))
           .filter(pair => pair._2.commonFriendsCount > 8)
           .map(p => Pair(p._1._1, p._1._2, p._2))
@@ -133,8 +133,9 @@ object Baseline {
       pairs.map(pair => {(
         pair.uid1,
         pair.uid2,
-        pair.features.commonFriendScoreOK,
+        pair.features.adamicAdar,
         pair.features.commonFriendsCount,
+        pair.features.fedorScore,
         pair.features.groupScores.commonRelatives,
         pair.features.groupScores.commonColleagues,
         pair.features.groupScores.commonSchoolmates,
@@ -143,8 +144,47 @@ object Baseline {
         .toDF.repartition(4).write.parquet(pairsPath + "/part_" + part)
     }
     */
-    val pairs = IO.readPairs(sqlc, pairsPath + "/part_33")
 
+    //val pairs = IO.readPairs(sqlc, pairsPath + "/part_*/")
+    /*
+    val pairScoreMap =
+      pairs
+        .map(pair => (pair.uid1, pair.uid2) -> pair.features.commonFriendsCount)
+
+    val pairScoreMapBC = sc.broadcast(pairScoreMap.collectAsMap())
+
+
+    val userFriendsMap =
+      graph
+        .map(userFriends => userFriends.uid -> userFriends.friends.map(graphFriend => graphFriend.uid))
+
+    val userFriendsMapBC = sc.broadcast(userFriendsMap.collectAsMap())
+
+    def simRank(x : Int, y : Int) = if (x == y) 1.0 else {
+      var sum = 0
+      for (friend1 <- userFriendsMapBC.value(x)) {
+        for (friend2 <- userFriendsMapBC.value(y)) {
+          sum += pairScoreMapBC.value.getOrElse((friend1, friend2), 0)
+        }
+      }
+      sum.toDouble / (friendsCountBC.value(x) * friendsCountBC.value(y)).toDouble
+    }
+
+    pairs
+      .map(pair => {(
+        pair.uid1,
+        pair.uid2,
+        pair.features.adamicAdar,
+        pair.features.commonFriendsCount,
+        pair.features.groupScores.commonRelatives,
+        pair.features.groupScores.commonColleagues,
+        pair.features.groupScores.commonSchoolmates,
+        pair.features.groupScores.commonArmyFellows,
+        pair.features.groupScores.commonFriends,
+        simRank(pair.uid1, pair.uid2))
+      })
+      .toDF.repartition(4).write.parquet(dataDir + "pairsWithSimRank")
+    */
     /// (coreUser1,  coreUser2) -> 1.0  :  coreUser1 < coreUser2
     /// I.e. realFriends
     val positives = graph.flatMap(
@@ -168,43 +208,70 @@ object Baseline {
     }
     val demographyBC = sc.broadcast(demography.collectAsMap())
 
+
+    val pairsForLearning = IO.readPairs(sqlc, pairsPath + "/part_33")
+
     def prepareData( pairs: RDD[Pair], positives: RDD[((Int, Int), Double)]) = {
       pairs
         .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC))
         .leftOuterJoin(positives)
     }
-    val data = {
-      prepareData(pairs, positives)
+
+    val dataForLearning = {
+      prepareData(pairsForLearning, positives)
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
     }
 
-    val splits = data.randomSplit(Array(0.1, 0.9), seed = 11L)
-    val training = splits(0).cache()
-    val validation = splits(1)
+
+    val splits = dataForLearning.randomSplit(Array(0.2, 0.8), seed = 11L)
+    //val trainingData = splits(0).cache()
+    val validationData = splits(1)
 
     // run training algorithm to build the model
+    /*
     val model = {
+
+      //new RandomForestClassificationModel()
       new LogisticRegressionWithLBFGS()
         .setNumClasses(2)
-        .run(training)
+        .run(trainingData)
     }
 
-    model.clearThreshold()
-    model.save(sc, modelPath)
+    // try to use с
 
+    val treeStrategy = Strategy.defaultStrategy("Classification")
+    val numTrees = 100 // Use more in practice.
+    val featureSubsetStrategy = "auto"
+
+
+    val model = RandomForest.trainClassifier(trainingData, treeStrategy, numTrees, featureSubsetStrategy, 152645)
+
+    val testErr = validationData.map { point =>
+      val prediction = model.predict(point.features)
+      if (point.label == prediction) 1.0 else 0.0
+    }//.mean()
+    */
+    val model = RandomForestModel.load(sc, modelPath)
+    //model.clearThreshold()
+
+      //model.save(sc, modelPath)
     val predictionAndLabels = {
-      validation.map { case LabeledPoint(label, features) =>
+      validationData.map { case LabeledPoint(label, features) =>
         val prediction = model.predict(features)
         (prediction, label)
       }
     }
 
+
+
+
+
     // estimate model quality
     @transient val metricsLogReg = new BinaryClassificationMetrics(predictionAndLabels, 100)
     val threshold = metricsLogReg.fMeasureByThreshold(2.0).sortBy(-_._2).take(1)(0)._1
 
-    val rocLogReg = metricsLogReg.areaUnderROC()
-    println("model ROC = " + rocLogReg.toString)
+    //val rocLogReg = metricsLogReg.areaUnderROC()
+    //println("model ROC = " + rocLogReg.toString)
 
     // compute scores on the test set
     val testCommonFriendsCounts = {
@@ -225,14 +292,13 @@ object Baseline {
 
       .map(t => {
         val user = t._1
-        val firendsWithRatings = t._2
-        val topBestFriends = firendsWithRatings.toList.sortBy(-_._2).take(100).map(x => x._1)
+        val friendsWithRatings = t._2.toList
+        val topBestFriends = friendsWithRatings.sortBy(-_._2).take(100).map(x => x._1)
         (user, topBestFriends)
       })
       .sortByKey(true, 1)
       .map(t => t._1 + "\t" + t._2.mkString("\t"))
 
       .saveAsTextFile(predictionPath, classOf[GzipCodec])
-
   }
 }

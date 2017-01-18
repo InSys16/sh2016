@@ -1,7 +1,9 @@
 import breeze.numerics.abs
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.broadcast.Broadcast
-import scala.collection.Map
+import org.apache.spark.rdd.RDD
+
+import org.apache.spark
 
 /**
   * Created by art on 14.01.17.
@@ -18,8 +20,8 @@ object FeatureExtractor {
   }
 
   def getFeatures(pair: Pair,
-                  demographyBC: Broadcast[Map[Int, Demography]],
-                  friendsCountBC: Broadcast[Map[Int, Int]]) = {
+                  demographyBC: Broadcast[scala.collection.Map[Int, Demography]],
+                  friendsCountBC: Broadcast[scala.collection.Map[Int, Int]]) = {
     val demography = demographyBC.value
     val friendsCount = friendsCountBC.value
     val features = pair.features
@@ -45,13 +47,22 @@ object FeatureExtractor {
       ageDiff,
       sameGender,
       samePosition,
-      features.commonFriendScoreOK,
+      features.adamicAdar,
       features.commonFriendsCount.toDouble,
+      features.fedorScore,
       groupFeatures.commonRelatives.toDouble,
       groupFeatures.commonColleagues.toDouble,
       groupFeatures.commonSchoolmates.toDouble,
       groupFeatures.commonArmyFellows.toDouble,
-      groupFeatures.commonFriends.toDouble)
+      groupFeatures.commonFriends.toDouble,
+
+      Math.log(features.commonFriendsCount.toDouble + 1.0),
+      Math.log(features.adamicAdar + 1.0),
+      Math.log((firstFriendsCount * secondFriendsCount) + 1.0),
+
+      (firstFriendsCount + secondFriendsCount) * 5.0,
+      abs(firstFriendsCount * secondFriendsCount)
+    )
 
   }
 }
