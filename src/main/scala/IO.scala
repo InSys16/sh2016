@@ -27,7 +27,7 @@ object IO {
                    adamicAdar : Double,
                    commonFriendsCount : Int,
                    fedorScore : Double,
-                   pageRank : Double,
+                   //pageRank : Double,
                    commonRelatives: Int,
                    commonColleagues: Int,
                    commonSchoolmates: Int,
