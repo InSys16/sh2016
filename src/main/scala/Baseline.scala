@@ -304,7 +304,7 @@ object Baseline {
 
     def prepareData( pairs: RDD[Pair], positives: RDD[((Int, Int), Double)]) = {
       pairs
-        .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
+        .map(pair => FeatureExtractor.getFeaturesLess(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
         //.map(pair => FeatureExtractor.getFeaturesForSum(pair))//, interactionsBC))
         .leftOuterJoin(positives)
     }
@@ -390,60 +390,58 @@ object Baseline {
         .filter(pair => pair.uid1 % 11 == 7 || pair.uid2 % 11 == 7)
     }
 
-    def sumFeatures(features: org.apache.spark.mllib.linalg.Vector, featureNum : Int) = {
-      var sum = 0.0
-      features.foreachActive((i, v) => if (featureNum == i) sum += v)
-      sum
+    def sumFeatures(features: org.apache.spark.mllib.linalg.Vector) = {
+      val res = Array(0.0,0.0,0.0)
+
+      features.foreachActive((i, v) => res(i) = v)
+      (res(0), res(1), res(2))
     }
-    var minAdarForFriend = 4000000.0
-    val finalData =
-      prepareData(pairsForPrediction, positives)
+    var min0 = 4000000.0
+    var min1 = 4000000.0
+    var min2 = 4000000.0
+
+    prepareData(pairsForPrediction, positives)
       .map(pair => pair._1 -> LabeledPoint(pair._2._2.getOrElse(0.0), pair._2._1))
-      //.filter(pair => pair._2.label == 0.0)
-    def predictForFeature(featureNum : Int) = {
-      finalData
-        .flatMap { case (pair, LabeledPoint(label, features)) =>
-          val prediction = sumFeatures(features, featureNum) //model.predict(features)
-          if (label == 1.0) {
-            minAdarForFriend = Math.min(minAdarForFriend, prediction)
-            Seq.empty[(Int, (Int, Double))]
-          }
-          else
-            Seq(pair._1 -> (pair._2, prediction), pair._2 -> (pair._1, prediction))
+      .flatMap { case (pair, LabeledPoint(label, features)) =>
+        val prediction = sumFeatures(features) //model.predict(features)
+        if (label == 1.0) {
+          min0 = Math.min(min0, prediction._1)
+          min1 = Math.min(min1, prediction._2)
+          min2 = Math.min(min2, prediction._3)
+          Seq.empty[(Int, (Int, (Double, Double, Double)))]
         }
-        .filter(t => t._1 % 11 == 7 && t._2._2 >= minAdarForFriend) //10)//threshold)
-        .groupByKey(numGraphParts)
+        else
+          Seq(pair._1 -> (pair._2, prediction), pair._2 -> (pair._1, prediction))
+      }
+      .filter(t => t._1 % 11 == 7 && t._2._2._1 >= min0 && t._2._2._2 >= min1 && t._2._2._3 >= min2) //10)//threshold)
+      .groupByKey(numGraphParts)
 
 
-        .map(t => {
+      .map(t => {
 
-          val user = t._1
-          val friendsWithRatings = t._2.toList
-          val topBestFriends = friendsWithRatings.sortBy(-_._2).take(100).map(x => x._1)
-          (user, topBestFriends)
-
-          /*
         val user = t._1
-        val friendsWithRatings = t._2.toList.sortBy(-_._2)
-
-        val availableCount = friendsWithRatings.length
-        val expectedCount = expCandidateCountBC.value.getOrElse(user, 1000)
-
-        var candidateCount = Math.max(25, Math.min(108, expectedCount))
-        candidateCount = Math.min(availableCount, candidateCount)
-
-        val topBestFriends = friendsWithRatings.take(candidateCount).map(x => x._1)
+        val friendsWithRatings = t._2.toList
+        val topBestFriends = friendsWithRatings.sortBy(x => x._2._1 * 10000.0 + x._2._2 * 100.0 + x._2._3).take(100).map(x => x._1)
         (user, topBestFriends)
-        */
-        })
-        .sortByKey(true, 1)
-        .map(t => t._1 + "\t" + t._2.mkString("\t"))
 
-        .saveAsTextFile(predictionPath + featureNum.toString, classOf[GzipCodec])
-    }
-    for (i <- 0 until 24) {
-      predictForFeature(i)
-    }
+        /*
+      val user = t._1
+      val friendsWithRatings = t._2.toList.sortBy(-_._2)
+
+      val availableCount = friendsWithRatings.length
+      val expectedCount = expCandidateCountBC.value.getOrElse(user, 1000)
+
+      var candidateCount = Math.max(25, Math.min(108, expectedCount))
+      candidateCount = Math.min(availableCount, candidateCount)
+
+      val topBestFriends = friendsWithRatings.take(candidateCount).map(x => x._1)
+      (user, topBestFriends)
+      */
+      })
+      .sortByKey(true, 1)
+      .map(t => t._1 + "\t" + t._2.mkString("\t"))
+
+      .saveAsTextFile(predictionPath + featureNum.toString, classOf[GzipCodec])
   }
 }
 
