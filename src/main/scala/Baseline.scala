@@ -306,15 +306,16 @@ object Baseline {
         .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
         .leftOuterJoin(positives)
     }
-
+    /*
     val dataForLearning = {
       prepareData(pairsForLearning, positives)
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
     }
-
+    */
     //val splits = dataForLearning.randomSplit(Array(0.2, 0.8), seed = 11L)
     //val trainingData = splits(0).cache()
     //val validationData = splits(1)
+    /*
     val trainingData = dataForLearning
 
     val pairsForValidation = IO.readPairs(sqlc, pairsPath + "/part_80")
@@ -322,14 +323,15 @@ object Baseline {
       prepareData(pairsForValidation, positives)
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
     }
+    */
     // run training algorithm to build the model
-
+    /*
     val model = {
       new LogisticRegressionWithLBFGS()
         .setNumClasses(2)
         .run(trainingData)
     }
-
+    */
     // try to use RandomForest
     /*
     val treeStrategy = Strategy.defaultStrategy("Classification")
@@ -345,6 +347,7 @@ object Baseline {
     }//.mean()
     */
     //val model = RandomForestModel.load(sc, modelPath)
+    /*
     model.clearThreshold()
 
     model.save(sc, modelPath)
@@ -359,7 +362,7 @@ object Baseline {
     // estimate model quality
     @transient val metricsLogReg = new BinaryClassificationMetrics(predictionAndLabels, 100)
     val threshold = metricsLogReg.fMeasureByThreshold(2.0).sortBy(-_._2).take(1)(0)._1
-
+    */
     //val rocLogReg = metricsLogReg.areaUnderROC()
     //println("model ROC = " + rocLogReg.toString)
 
@@ -380,20 +383,28 @@ object Baseline {
     val expCandidateCountBC = sc.broadcast(expectedCandidateCount.collectAsMap())
     */
 
-    val testCommonFriendsCounts = {
+    val pairsForPrediction = {
       IO.readPairs(sqlc, pairsPath + "/part_*/")
         .filter(pair => pair.uid1 % 11 == 7 || pair.uid2 % 11 == 7)
     }
 
-    prepareData(testCommonFriendsCounts, positives)
-      .map(t => t._1 -> LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
-      .filter(t => t._2.label == 0.0)
-
-      .flatMap { case (id, LabeledPoint(label, features)) =>
-        val prediction = model.predict(features)
-        Seq(id._1 -> (id._2, prediction), id._2 -> (id._1, prediction))
+    def sumFeatures(features: org.apache.spark.mllib.linalg.Vector) = {
+      var sum = 0.0
+      for (i <- features){
+        sum += i
       }
-      .filter(t => t._1 % 11 == 7 && t._2._2 >= threshold)
+      sum
+    }
+
+    prepareData(pairsForPrediction, positives)
+      .map(pair => pair._1 -> LabeledPoint(pair._2._2.getOrElse(0.0), pair._2._1))
+      .filter(pair => pair._2.label == 0.0)
+
+      .flatMap { case (pair, LabeledPoint(label, features)) =>
+        val prediction = sumFeatures(features)//model.predict(features)
+        Seq(pair._1 -> (pair._2, prediction), pair._2 -> (pair._1, prediction))
+      }
+      .filter(t => t._1 % 11 == 7 && t._2._2 >= 10)//threshold)
       .groupByKey(numGraphParts)
 
       .map(t => {
