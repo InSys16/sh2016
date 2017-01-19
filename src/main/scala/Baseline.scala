@@ -400,8 +400,12 @@ object Baseline {
 
       .flatMap { case (pair, LabeledPoint(label, features)) =>
         val prediction = sumFeatures(features)//model.predict(features)
-        if (label == 1.0) minAdarForFriend = Math.min(minAdarForFriend, prediction)
-        Seq(pair._1 -> (pair._2, prediction), pair._2 -> (pair._1, prediction))
+        if (label == 1.0) {
+          minAdarForFriend = Math.min(minAdarForFriend, prediction)
+          Seq.empty[(Int, (Int, Double))]
+        }
+        else
+          Seq(pair._1 -> (pair._2, prediction), pair._2 -> (pair._1, prediction))
       }
       .filter(t => t._1 % 11 == 7 && t._2._2 >= minAdarForFriend)//10)//threshold)
       .groupByKey(numGraphParts)
