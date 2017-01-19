@@ -293,7 +293,7 @@ object Baseline {
           val gender = lineSplit(3).toInt
           val country = lineSplit(4).toLong
           val location = lineSplit(5).toInt
-          val loginRegion = if (lineSplit(6) == "") 0 else lineSplit(6).toInt
+          val loginRegion = if (lineSplit.length < 7) 0 else lineSplit(6).toInt
           uid -> Demography(createDate, age, gender, country, location, loginRegion)
         })
     }
