@@ -37,7 +37,7 @@ object Baseline {
 
     val sparkConf = new SparkConf()
       .setAppName("Baseline")
-      .set("spark.driver.maxResultSize", "3g")
+      .set("spark.driver.maxResultSize", "10g")
     val sc = new SparkContext(sparkConf)
     val sqlc = new SQLContext(sc)
 
