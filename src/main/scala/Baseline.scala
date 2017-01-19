@@ -102,15 +102,16 @@ object Baseline {
             }
             friends
           })
-      val graphForPageRank = Graph.fromEdges(edges, 1)
       val pageRank =
-        graphForPageRank.pageRank(5)
+        Graph.fromEdges(edges, 1)
+          .staticPageRank(5)
           .vertices
-        .map(vert => (vert._1.toInt, vert._2))
-      val maxPageRank = pageRank.map(pair => pair._2).max()
-      val normalized =
-        pageRank.map(pair => (pair._1.toInt, pair._2 / maxPageRank))
-      val x = normalized.toDF().write.parquet(pageRankPath)
+          .map(vert => (vert._1.toInt, vert._2))
+          .toDF().write.parquet(pageRankPath)
+      //val maxPageRank = pageRank.map(pair => pair._2).max()
+      //val normalized =
+      //  pageRank.map(pair => (pair._1.toInt, pair._2 / maxPageRank))
+      //val x = normalized.toDF().write.parquet(pageRankPath)
     }
 
     def loadPageRank() = {
