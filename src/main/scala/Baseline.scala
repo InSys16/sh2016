@@ -359,7 +359,7 @@ object Baseline {
     //val rocLogReg = metricsLogReg.areaUnderROC()
     //println("model ROC = " + rocLogReg.toString)
 
-
+    /*
     val totalFriendCount =
       mainUsersFriendsCount
       .map(x => x._2)
@@ -374,7 +374,7 @@ object Baseline {
       })
 
     val expCandidateCountBC = sc.broadcast(expectedCandidateCount.collectAsMap())
-
+    */
 
     val testCommonFriendsCounts = {
       IO.readPairs(sqlc, pairsPath + "/part_*/")
@@ -393,12 +393,13 @@ object Baseline {
       .groupByKey(numGraphParts)
 
       .map(t => {
-        /*
+
         val user = t._1
         val friendsWithRatings = t._2.toList
         val topBestFriends = friendsWithRatings.sortBy(-_._2).take(100).map(x => x._1)
         (user, topBestFriends)
-        */
+
+        /*
         val user = t._1
         val friendsWithRatings = t._2.toList.sortBy(-_._2)
 
@@ -410,6 +411,7 @@ object Baseline {
 
         val topBestFriends = friendsWithRatings.take(candidateCount).map(x => x._1)
         (user, topBestFriends)
+        */
       })
       .sortByKey(true, 1)
       .map(t => t._1 + "\t" + t._2.mkString("\t"))
