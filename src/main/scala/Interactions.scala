@@ -30,8 +30,8 @@ object Interactions {
       case 18 => 1//отправка подарка
     }
 
-  def calculateInteractions(interactions: Seq[(Int, Int)]) = {
-    var sum = 0
+  def calculateInteractions(interactions: Seq[(Int, Double)]) = {
+    var sum = 0.0
     for ((typeOfInter, n) <- interactions){
       sum += typeOfInterEvaluator(typeOfInter) * n
     }

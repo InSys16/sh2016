@@ -23,7 +23,7 @@ object FeatureExtractor {
                   demographyBC: Broadcast[scala.collection.Map[Int, Demography]],
                   friendsCountBC: Broadcast[scala.collection.Map[Int, Int]],
                   regionsProximityBC: Broadcast[scala.collection.Map[(Int, Int), Int]],
-                  interactionsBC: Broadcast[scala.collection.Map[(Int, Int), Int]]) = {
+                  interactionsBC: Broadcast[scala.collection.Map[(Int, Int), Double]]) = {
     val demography = demographyBC.value
     val friendsCount = friendsCountBC.value
     val features = pair.features
