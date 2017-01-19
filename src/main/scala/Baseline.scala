@@ -156,14 +156,15 @@ object Baseline {
         .sortWith(_.uid < _.uid)))
       .filter(userFriends => userFriends.friends.length >= 2 && userFriends.friends.length <= 2000)
       .toDF.write.parquet(reversedGraphPath)
-    */
+
     val reversedGraph = IO.readReversedGraph(sqlc, reversedGraphPath)
 
     val mainUsersFriendsCount = graph.map(user => user.uid -> user.friends.length)
     val otherUsersFriendsCount = reversedGraph.map(user => user.uid -> user.friends.length)
     val friendsCount = mainUsersFriendsCount.union(otherUsersFriendsCount)
     val friendsCountBC = sc.broadcast(friendsCount.collectAsMap())
-    /*
+
+
     def generatePairs(userFriends: UserFriends,
                       numOfPart: Int,
                       coreUsers: Broadcast[Set[Int]],
@@ -279,7 +280,7 @@ object Baseline {
         .map(x => (x._1.toInt, x._2.toInt) -> Interactions.calculateInteractions(x._3))
 
     val interactionsBC = sc.broadcast(interactions.collectAsMap())
-    */
+
     val pairsForLearning = IO.readPairs(sqlc, pairsPath + "/part_33")
 
 
@@ -300,10 +301,11 @@ object Baseline {
     val demographyBC = sc.broadcast(demography.collectAsMap())
 
     val regionsProximityBC = sc.broadcast(loadRegionsProximity())
-
+    */
     def prepareData( pairs: RDD[Pair], positives: RDD[((Int, Int), Double)]) = {
       pairs
-        .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
+        //.map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
+        .map(pair => FeatureExtractor.getFeaturesForSum(pair))//, interactionsBC))
         .leftOuterJoin(positives)
     }
     /*
@@ -390,7 +392,7 @@ object Baseline {
 
     def sumFeatures(features: org.apache.spark.mllib.linalg.Vector) = {
       var sum = 0.0
-      features.foreachActive((i, v) => if (i == 5) sum += v)
+      features.foreachActive((i, v) => sum += v)
       sum
     }
     var minAdarForFriend = 4000000.0

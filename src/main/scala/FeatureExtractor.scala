@@ -92,14 +92,17 @@ object FeatureExtractor {
 
   }
 
-  def getFeaturesForSum(pair: Pair,
-                  demographyBC: Broadcast[scala.collection.Map[Int, Demography]],
-                  friendsCountBC: Broadcast[scala.collection.Map[Int, Int]],
-                  regionsProximityBC: Broadcast[scala.collection.Map[(Int, Int), Int]]) = {
+  def getFeaturesForSum(pair: Pair) = {
+                  //demographyBC: Broadcast[scala.collection.Map[Int, Demography]],
+                  //friendsCountBC: Broadcast[scala.collection.Map[Int, Int]],
+                  //regionsProximityBC: Broadcast[scala.collection.Map[(Int, Int), Int]]) = {
     //interactionsBC: Broadcast[scala.collection.Map[(Int, Int), Double]]) = {
+
+    val features = pair.features
+    /*
     val demography = demographyBC.value
     val friendsCount = friendsCountBC.value
-    val features = pair.features
+
     val groupFeatures = pair.features.groupScores
 
     val firstDemography = demography.getOrElse(pair.uid1, Demography(0, 0, 0, 0, 0, 0))
@@ -123,13 +126,17 @@ object FeatureExtractor {
     val minFriendsCount = math.min(firstFriendsCount, secondFriendsCount)
     val normalizedCommonFriends = if (minFriendsCount == 0) 0.0 else features.commonFriendsCount.toDouble / minFriendsCount.toDouble
     val regDiff = abs(firstDemography.createDate - secondDemography.createDate).toDouble
+    */
     (pair.uid1, pair.uid2) -> Vectors.dense(
+      /*
       cosine,
       jaccard,
       ageDiff,
       sameGender,
       positionProximity,
-      features.adamicAdar,
+      */
+      features.adamicAdar
+      /*
       features.commonFriendsCount.toDouble,
       features.fedorScore,
       //features.pageRank,
@@ -153,6 +160,7 @@ object FeatureExtractor {
       regDiff,
       ageMean,
       0.5 * (1.0 / firstFriendsCount.toDouble + 1.0 / secondFriendsCount.toDouble) * features.adamicAdar
+      */
       //interactions,
       //Math.log(interactions + 1.0)
     )
