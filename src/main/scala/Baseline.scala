@@ -86,7 +86,7 @@ object Baseline {
 
     //calculateRegionsProximity()
     
-
+    /*
     def calculatePageRank() = {
       val edges = 
       	sc.textFile(graphPath)
@@ -121,9 +121,9 @@ object Baseline {
     }
 
     calculatePageRank()
-
+    */
     //val pageRankBC = sc.broadcast(loadPageRank())
-    /*
+
     val graph = {
       sc.textFile(graphPath)
         .map(line => {
@@ -160,7 +160,7 @@ object Baseline {
     val otherUsersFriendsCount = reversedGraph.map(user => user.uid -> user.friends.length)
     val friendsCount = mainUsersFriendsCount.union(otherUsersFriendsCount)
     val friendsCountBC = sc.broadcast(friendsCount.collectAsMap())
-
+    /*
     def generatePairs(userFriends: UserFriends,
                       numOfPart: Int,
                       coreUsers: Broadcast[Set[Int]],
@@ -189,7 +189,7 @@ object Baseline {
       }
       pairs
     }
-    /*
+
     for (part <- 0 until numPairsParts) {
       val pairs = {
         reversedGraph
@@ -214,7 +214,7 @@ object Baseline {
         .toDF.repartition(4).write.parquet(pairsPath + "/part_" + part)
     }
     */
-	*/
+
     //val pairs = IO.readPairs(sqlc, pairsPath + "/part_*/")
     /*
     val pairScoreMap =
@@ -255,7 +255,7 @@ object Baseline {
       })
       .toDF.repartition(4).write.parquet(dataDir + "pairsWithSimRank")
     */
-    /*
+
     /// (coreUser1,  coreUser2) -> 1.0  :  coreUser1 < coreUser2
     /// I.e. realFriends
     val positives = graph.flatMap(
@@ -337,13 +337,13 @@ object Baseline {
 
     //val rocLogReg = metricsLogReg.areaUnderROC()
     //println("model ROC = " + rocLogReg.toString)
-	*/
+
     // compute scores on the test set
-    //val testCommonFriendsCounts = {
-    //  IO.readPairs(sqlc, pairsPath + "/part_*/")
-    //    .filter(pair => pair.uid1 % 11 == 7 || pair.uid2 % 11 == 7)
-    //}
-    /*
+    val testCommonFriendsCounts = {
+      IO.readPairs(sqlc, pairsPath + "/part_*/")
+        .filter(pair => pair.uid1 % 11 == 7 || pair.uid2 % 11 == 7)
+    }
+
     prepareData(testCommonFriendsCounts, positives)
       .map(t => t._1 -> LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
       .filter(t => t._2.label == 0.0)
@@ -365,6 +365,5 @@ object Baseline {
       .map(t => t._1 + "\t" + t._2.mkString("\t"))
 
       .saveAsTextFile(predictionPath, classOf[GzipCodec])
-      */
   }
 }
