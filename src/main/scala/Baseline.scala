@@ -26,7 +26,7 @@ import scala.collection.mutable.ArrayBuffer
 
 case class GraphFriend(uid: Int, group: Int)//, interactionScore: Double = 0f)
 case class UserFriends(uid: Int, friends: Array[GraphFriend])
-case class Demography(createDate : Int, age: Int, gender: Int, country : Int, location: Int, loginRegion: Int)
+case class Demography(createDate : Long, age: Int, gender: Int, country : Long, location: Int, loginRegion: Int)
 
 case class Pair(uid1: Int,
                 uid2: Int,
@@ -288,10 +288,10 @@ object Baseline {
         .map(line => { // 0userId 1create_date 2birth_date 3gender 4ID_country 5ID_Location 6loginRegion
         val lineSplit = line.trim().split("\t")
           val uid = lineSplit(0).toInt
-          val createDate = lineSplit(1).toInt
+          val createDate = lineSplit(1).toLong
           val age = lineSplit(2).toInt
           val gender = lineSplit(3).toInt
-          val country = lineSplit(4).toInt
+          val country = lineSplit(4).toLong
           val location = lineSplit(5).toInt
           val loginRegion = if (lineSplit(6) == "") 0 else lineSplit(6).toInt
           uid -> Demography(createDate, age, gender, country, location, loginRegion)
