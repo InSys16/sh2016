@@ -268,8 +268,8 @@ object Baseline {
         )
     val interactions =
       sqlc.read.parquet(interactionsPath)
-        .map{ case Row(uid1: Long, uid2: Long, list: Seq[Row]) =>
-          (uid1, uid2, list.map{ case Row(index: Int, value: Double) =>
+        .map{ case Row(uid1: Int, uid2: Int, list: Seq[Row]) =>
+          (uid1, uid2, list.map{ case Row(index: Int, value: Int) =>
             (index, value)})}
         .map(x => (x._1.toInt, x._2.toInt) -> Interactions.calculateInteractions(x._3))
 
