@@ -88,20 +88,20 @@ object Baseline {
     
 
     def calculatePageRank() = {
-      val edges = {
-      sc.textFile(graphPath)
-        .flatMap(line => {
-          val lineSplit = line.split("\t")
-          val user = lineSplit(0).toInt
-          val friends = {
-            lineSplit(1)
-              .replace("{(", "")
-              .replace(")}", "")
-              .split("\\),\\(")
-              .map(t => Edge(user, t.split(",")(0).toInt, 1))
-          }
-          friends
-        })
+      val edges = 
+      	sc.textFile(graphPath)
+          .flatMap(line => {
+            val lineSplit = line.split("\t")
+            val user = lineSplit(0).toInt
+            val friends = {
+              lineSplit(1)
+                .replace("{(", "")
+                .replace(")}", "")
+                .split("\\),\\(")
+                .map(t => Edge(user, t.split(",")(0).toInt, 1))
+            }
+            friends
+          })
       val graphForPageRank = Graph.fromEdges(edges, 1)
       val pageRank =
         graphForPageRank.pageRank(5)
