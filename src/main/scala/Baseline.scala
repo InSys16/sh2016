@@ -53,6 +53,7 @@ object Baseline {
     val modelPath = dataDir + "LogisticRegressionModel"
     val pageRankPath = dataDir + "PageRank"
     val regionProximityPath = dataDir + "RegionProximity"
+    val interactionsPath = dataDir + "Interactions"
     val numGraphParts = 200
     val numPairsParts = 107
 
@@ -265,7 +266,14 @@ object Baseline {
             .filter(x => coreUsersBC.value.contains(x.uid) && userFriends.uid < x.uid)
             .map(x => (userFriends.uid, x.uid) -> 1.0)
         )
+    val interactions =
+      sqlc.read.parquet(interactionsPath)
+        .map{ case Row(uid1: Long, uid2: Long, list: Seq[Row]) =>
+          (uid1, uid2, list.map{ case Row(index: Int, value: Double) =>
+            (index, value)})}
+        .map(x => (x._1.toInt, x._2.toInt) -> Interactions.calculateInteractions(x._3))
 
+    val interactionsBC = sc.broadcast(interactions.collectAsMap())
     val pairsForLearning = IO.readPairs(sqlc, pairsPath + "/part_33")
 
 
@@ -287,7 +295,7 @@ object Baseline {
 
     def prepareData( pairs: RDD[Pair], positives: RDD[((Int, Int), Double)]) = {
       pairs
-        .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))
+        .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC, interactionsBC))
         .leftOuterJoin(positives)
     }
 
