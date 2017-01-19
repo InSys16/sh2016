@@ -12,6 +12,9 @@ object FeatureExtractor {
   def isEq(x: Int, y: Int) = {
     if (x == y && x != 0) 1.0 else 0.0
   }
+  def isEqL(x: Long, y: Long) = {
+    if (x == y && x != 0) 1.0 else 0.0
+  }
 
   def countCosine(a : Int, b : Int, c : Int) = {
     if (a == 0 && b ==0) 0.0 else c / math.sqrt(a * b)
@@ -75,7 +78,7 @@ object FeatureExtractor {
 
       normalizedCommonFriends,
 
-      isEq(firstDemography.country,secondDemography.country),
+      isEqL(firstDemography.country,secondDemography.country),
       isEq(firstDemography.loginRegion,secondDemography.loginRegion),
       regDiff
       //interactions,
