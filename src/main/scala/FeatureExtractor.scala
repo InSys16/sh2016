@@ -46,7 +46,7 @@ object FeatureExtractor {
       if ((firstDemography.position == secondDemography.position) && (firstDemography.position != 0)) 1.0 else
         if (regionProximity >= 50000) 0.5 else 0.0
 
-    val interactions = interactionsBC.value.getOrElse((pair.uid1, pair.uid2), 0)
+    val interactions = interactionsBC.value.getOrElse((pair.uid1, pair.uid2), 0.0)
 
     (pair.uid1, pair.uid2) -> Vectors.dense(
       cosine,
