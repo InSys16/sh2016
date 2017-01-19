@@ -156,7 +156,7 @@ object Baseline {
         .sortWith(_.uid < _.uid)))
       .filter(userFriends => userFriends.friends.length >= 2 && userFriends.friends.length <= 2000)
       .toDF.write.parquet(reversedGraphPath)
-
+    */
     val reversedGraph = IO.readReversedGraph(sqlc, reversedGraphPath)
 
     val mainUsersFriendsCount = graph.map(user => user.uid -> user.friends.length)
@@ -164,7 +164,7 @@ object Baseline {
     val friendsCount = mainUsersFriendsCount.union(otherUsersFriendsCount)
     val friendsCountBC = sc.broadcast(friendsCount.collectAsMap())
 
-
+    /*
     def generatePairs(userFriends: UserFriends,
                       numOfPart: Int,
                       coreUsers: Broadcast[Set[Int]],
@@ -283,7 +283,7 @@ object Baseline {
 
     val pairsForLearning = IO.readPairs(sqlc, pairsPath + "/part_33")
 
-
+    */
     val demography = {
       sc.textFile(demographyPath)
         .map(line => { // 0userId 1create_date 2birth_date 3gender 4ID_country 5ID_Location 6loginRegion
@@ -301,11 +301,11 @@ object Baseline {
     val demographyBC = sc.broadcast(demography.collectAsMap())
 
     val regionsProximityBC = sc.broadcast(loadRegionsProximity())
-    */
+
     def prepareData( pairs: RDD[Pair], positives: RDD[((Int, Int), Double)]) = {
       pairs
-        //.map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
-        .map(pair => FeatureExtractor.getFeaturesForSum(pair))//, interactionsBC))
+        .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
+        //.map(pair => FeatureExtractor.getFeaturesForSum(pair))//, interactionsBC))
         .leftOuterJoin(positives)
     }
     /*
@@ -390,37 +390,39 @@ object Baseline {
         .filter(pair => pair.uid1 % 11 == 7 || pair.uid2 % 11 == 7)
     }
 
-    def sumFeatures(features: org.apache.spark.mllib.linalg.Vector) = {
+    def sumFeatures(features: org.apache.spark.mllib.linalg.Vector, featureNum : Int) = {
       var sum = 0.0
-      features.foreachActive((i, v) => sum += v)
+      features.foreachActive((i, v) => if (featureNum == i) sum += v)
       sum
     }
     var minAdarForFriend = 4000000.0
-    prepareData(pairsForPrediction, positives)
+    val finalData =
+      prepareData(pairsForPrediction, positives)
       .map(pair => pair._1 -> LabeledPoint(pair._2._2.getOrElse(0.0), pair._2._1))
       //.filter(pair => pair._2.label == 0.0)
-
-      .flatMap { case (pair, LabeledPoint(label, features)) =>
-        val prediction = sumFeatures(features)//model.predict(features)
-        if (label == 1.0) {
-          minAdarForFriend = Math.min(minAdarForFriend, prediction)
-          Seq.empty[(Int, (Int, Double))]
+    def predictForFeature(featureNum : Int) = {
+      finalData
+        .flatMap { case (pair, LabeledPoint(label, features)) =>
+          val prediction = sumFeatures(features, featureNum) //model.predict(features)
+          if (label == 1.0) {
+            minAdarForFriend = Math.min(minAdarForFriend, prediction)
+            Seq.empty[(Int, (Int, Double))]
+          }
+          else
+            Seq(pair._1 -> (pair._2, prediction), pair._2 -> (pair._1, prediction))
         }
-        else
-          Seq(pair._1 -> (pair._2, prediction), pair._2 -> (pair._1, prediction))
-      }
-      .filter(t => t._1 % 11 == 7 && t._2._2 >= minAdarForFriend)//10)//threshold)
-      .groupByKey(numGraphParts)
+        .filter(t => t._1 % 11 == 7 && t._2._2 >= minAdarForFriend) //10)//threshold)
+        .groupByKey(numGraphParts)
 
 
-      .map(t => {
+        .map(t => {
 
-        val user = t._1
-        val friendsWithRatings = t._2.toList
-        val topBestFriends = friendsWithRatings.sortBy(-_._2).take(100).map(x => x._1)
-        (user, topBestFriends)
+          val user = t._1
+          val friendsWithRatings = t._2.toList
+          val topBestFriends = friendsWithRatings.sortBy(-_._2).take(100).map(x => x._1)
+          (user, topBestFriends)
 
-        /*
+          /*
         val user = t._1
         val friendsWithRatings = t._2.toList.sortBy(-_._2)
 
@@ -433,11 +435,15 @@ object Baseline {
         val topBestFriends = friendsWithRatings.take(candidateCount).map(x => x._1)
         (user, topBestFriends)
         */
-      })
-      .sortByKey(true, 1)
-      .map(t => t._1 + "\t" + t._2.mkString("\t"))
+        })
+        .sortByKey(true, 1)
+        .map(t => t._1 + "\t" + t._2.mkString("\t"))
 
-      .saveAsTextFile(predictionPath, classOf[GzipCodec])
+        .saveAsTextFile(predictionPath + featureNum.toString, classOf[GzipCodec])
+    }
+    for (i <- 0 until 24) {
+      predictForFeature(i)
+    }
   }
 }
 
