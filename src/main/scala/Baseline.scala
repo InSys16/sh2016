@@ -296,10 +296,16 @@ object Baseline {
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
     }
 
-    val splits = dataForLearning.randomSplit(Array(0.2, 0.8), seed = 11L)
-    val trainingData = splits(0).cache()
-    val validationData = splits(1)
+    //val splits = dataForLearning.randomSplit(Array(0.2, 0.8), seed = 11L)
+    //val trainingData = splits(0).cache()
+    //val validationData = splits(1)
+    val trainingData = dataForLearning
 
+    val pairsForValidation = IO.readPairs(sqlc, pairsPath + "/part_80")
+    val validationData = {
+      prepareData(pairsForValidation, positives)
+        .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
+    }
     // run training algorithm to build the model
     val model = {
       new LogisticRegressionWithLBFGS()
