@@ -304,7 +304,7 @@ object Baseline {
         .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
         .leftOuterJoin(positives)
     }
-
+/*
     val dataForLearning = {
       prepareData(pairsForLearning, positives)
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
@@ -314,19 +314,20 @@ object Baseline {
     //val trainingData = splits(0).cache()
     //val validationData = splits(1)
     val trainingData = dataForLearning
-
+    */
     val pairsForValidation = IO.readPairs(sqlc, pairsPath + "/part_80")
     val validationData = {
       prepareData(pairsForValidation, positives)
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
     }
     // run training algorithm to build the model
+    /*
     val model = {
       new LogisticRegressionWithLBFGS()
         .setNumClasses(2)
         .run(trainingData)
     }
-
+    */
     // try to use RandomForest
     /*
     val treeStrategy = Strategy.defaultStrategy("Classification")
@@ -342,9 +343,10 @@ object Baseline {
     }//.mean()
     */
     //val model = RandomForestModel.load(sc, modelPath)
-    model.clearThreshold()
+    //model.clearThreshold()
 
-    model.save(sc, modelPath)
+    //model.save(sc, modelPath)
+    val model = LogisticRegressionModel.load(sc, modelPath)
     val predictionAndLabels = {
       validationData.map { case LabeledPoint(label, features) =>
         val prediction = model.predict(features)
