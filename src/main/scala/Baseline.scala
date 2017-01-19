@@ -390,9 +390,7 @@ object Baseline {
 
     def sumFeatures(features: org.apache.spark.mllib.linalg.Vector) = {
       var sum = 0.0
-      for (i <- features){
-        sum += i
-      }
+      features.foreachActive((i, v) => sum += v)
       sum
     }
 
