@@ -441,7 +441,7 @@ object Baseline {
       .sortByKey(true, 1)
       .map(t => t._1 + "\t" + t._2.mkString("\t"))
 
-      .saveAsTextFile(predictionPath + featureNum.toString, classOf[GzipCodec])
+      .saveAsTextFile(predictionPath, classOf[GzipCodec])
   }
 }
 
