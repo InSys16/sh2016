@@ -26,7 +26,7 @@ import scala.collection.mutable.ArrayBuffer
 
 case class GraphFriend(uid: Int, group: Int)//, interactionScore: Double = 0f)
 case class UserFriends(uid: Int, friends: Array[GraphFriend])
-case class Demography(age: Int, gender: Int, position : Int)
+case class Demography(createDate : Int, age: Int, gender: Int, country : Int, location: Int, loginRegion: Int)
 
 case class Pair(uid1: Int,
                 uid2: Int,
@@ -287,12 +287,14 @@ object Baseline {
       sc.textFile(demographyPath)
         .map(line => { // 0userId 1create_date 2birth_date 3gender 4ID_country 5ID_Location 6loginRegion
         val lineSplit = line.trim().split("\t")
-          if (lineSplit(2) == "") {
-            lineSplit(0).toInt -> Demography(0, lineSplit(3).toInt, lineSplit(5).toInt)
-          }
-          else {
-            lineSplit(0).toInt -> Demography(lineSplit(2).toInt, lineSplit(3).toInt, lineSplit(5).toInt)
-          }
+          val uid = lineSplit(0).toInt
+          val createDate = lineSplit(1).toInt
+          val age = lineSplit(2).toInt
+          val gender = lineSplit(3).toInt
+          val country = lineSplit(4).toInt
+          val location = lineSplit(5).toInt
+          val loginRegion = if (lineSplit(6) == "") 0 else lineSplit(6).toInt
+          uid -> Demography(createDate, age, gender, country, location, loginRegion)
         })
     }
     val demographyBC = sc.broadcast(demography.collectAsMap())
@@ -304,7 +306,7 @@ object Baseline {
         .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
         .leftOuterJoin(positives)
     }
-/*
+
     val dataForLearning = {
       prepareData(pairsForLearning, positives)
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
@@ -314,20 +316,20 @@ object Baseline {
     //val trainingData = splits(0).cache()
     //val validationData = splits(1)
     val trainingData = dataForLearning
-    */
+
     val pairsForValidation = IO.readPairs(sqlc, pairsPath + "/part_80")
     val validationData = {
       prepareData(pairsForValidation, positives)
         .map(t => LabeledPoint(t._2._2.getOrElse(0.0), t._2._1))
     }
     // run training algorithm to build the model
-    /*
+
     val model = {
       new LogisticRegressionWithLBFGS()
         .setNumClasses(2)
         .run(trainingData)
     }
-    */
+
     // try to use RandomForest
     /*
     val treeStrategy = Strategy.defaultStrategy("Classification")
@@ -343,10 +345,10 @@ object Baseline {
     }//.mean()
     */
     //val model = RandomForestModel.load(sc, modelPath)
-    //model.clearThreshold()
+    model.clearThreshold()
 
-    //model.save(sc, modelPath)
-    val model = LogisticRegressionModel.load(sc, modelPath)
+    model.save(sc, modelPath)
+    //val model = LogisticRegressionModel.load(sc, modelPath)
     val predictionAndLabels = {
       validationData.map { case LabeledPoint(label, features) =>
         val prediction = model.predict(features)

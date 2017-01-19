@@ -9,6 +9,9 @@ import org.apache.spark
   * Created by art on 14.01.17.
   */
 object FeatureExtractor {
+  def isEq(x: Int, y: Int) = {
+    if (x == y && x != 0) 1.0 else 0.0
+  }
 
   def countCosine(a : Int, b : Int, c : Int) = {
     if (a == 0 && b ==0) 0.0 else c / math.sqrt(a * b)
@@ -29,25 +32,24 @@ object FeatureExtractor {
     val features = pair.features
     val groupFeatures = pair.features.groupScores
 
-    val firstDemography = demography.getOrElse(pair.uid1, Demography(0, 0, 0))
-    val secondDemography = demography.getOrElse(pair.uid2, Demography(0, 0, 0))
+    val firstDemography = demography.getOrElse(pair.uid1, Demography(0, 0, 0, 0, 0, 0))
+    val secondDemography = demography.getOrElse(pair.uid2, Demography(0, 0, 0, 0, 0, 0))
     val firstFriendsCount = friendsCount.getOrElse(pair.uid1, 0)
     val secondFriendsCount = friendsCount.getOrElse(pair.uid2, 0)
     val jaccard = countJaccard(firstFriendsCount, secondFriendsCount, features.commonFriendsCount)
     val cosine  = countCosine(firstFriendsCount, secondFriendsCount, features.commonFriendsCount)
     val sameGender = if (firstDemography.gender == secondDemography.gender) 1.0 else 0.0
-    val ageDiff = {
-      val ageDiff = abs(firstDemography.age - secondDemography.age).toDouble
-      //1/scala.math.pow(2,ageDiff)
-      ageDiff
-    }
+    val ageDiff = abs(firstDemography.age - secondDemography.age).toDouble
     val regionProximity = regionsProximityBC.value.getOrElse((pair.uid1, pair.uid2), 0)
     val positionProximity =
-      if ((firstDemography.position == secondDemography.position) && (firstDemography.position != 0)) 1.0 else
+      if ((firstDemography.country == secondDemography.country) && (firstDemography.country != 0)) 1.0 else
         if (regionProximity >= 50000) 0.5 else 0.0
 
     //val interactions = interactionsBC.value.getOrElse((pair.uid1, pair.uid2), 0.0)
 
+    val minFriendsCount = math.min(firstFriendsCount, secondFriendsCount)
+    val normalizedCommonFriends = if (minFriendsCount == 0) 0.0 else features.commonFriendsCount.toDouble / minFriendsCount.toDouble
+    val regDiff = abs(firstDemography.createDate - secondDemography.createDate).toDouble
     (pair.uid1, pair.uid2) -> Vectors.dense(
       cosine,
       jaccard,
@@ -69,7 +71,13 @@ object FeatureExtractor {
       Math.log((firstFriendsCount * secondFriendsCount) + 1.0),
 
       (firstFriendsCount + secondFriendsCount) * 5.0,
-      abs(firstFriendsCount * secondFriendsCount)
+      abs(firstFriendsCount * secondFriendsCount),
+
+      normalizedCommonFriends,
+
+      isEq(firstDemography.country,secondDemography.country),
+      isEq(firstDemography.loginRegion,secondDemography.loginRegion),
+      regDiff
       //interactions,
       //Math.log(interactions + 1.0)
     )
