@@ -136,11 +136,11 @@ object Baseline {
               .replace(")}", "")
               .split("\\),\\(")
               .map(t => GraphFriend(t.split(",")(0).toInt,
-                                    GroupDefiner.defineGroupByNumber(t.split(",")(1).toInt)))
+                GroupDefiner.defineGroupByNumber(t.split(",")(1).toInt)))
           }
           UserFriends(user, friends)
         })
-
+    }
 
     val coreUsers = graph.map(user => user.uid)
     val coreUsersBC = sc.broadcast(coreUsers.collect().toSet)
