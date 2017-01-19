@@ -22,8 +22,8 @@ object FeatureExtractor {
   def getFeatures(pair: Pair,
                   demographyBC: Broadcast[scala.collection.Map[Int, Demography]],
                   friendsCountBC: Broadcast[scala.collection.Map[Int, Int]],
-                  regionsProximityBC: Broadcast[scala.collection.Map[(Int, Int), Int]],
-                  interactionsBC: Broadcast[scala.collection.Map[(Int, Int), Double]]) = {
+                  regionsProximityBC: Broadcast[scala.collection.Map[(Int, Int), Int]]) = {
+                  //interactionsBC: Broadcast[scala.collection.Map[(Int, Int), Double]]) = {
     val demography = demographyBC.value
     val friendsCount = friendsCountBC.value
     val features = pair.features
@@ -46,7 +46,7 @@ object FeatureExtractor {
       if ((firstDemography.position == secondDemography.position) && (firstDemography.position != 0)) 1.0 else
         if (regionProximity >= 50000) 0.5 else 0.0
 
-    val interactions = interactionsBC.value.getOrElse((pair.uid1, pair.uid2), 0.0)
+    //val interactions = interactionsBC.value.getOrElse((pair.uid1, pair.uid2), 0.0)
 
     (pair.uid1, pair.uid2) -> Vectors.dense(
       cosine,
@@ -69,9 +69,9 @@ object FeatureExtractor {
       Math.log((firstFriendsCount * secondFriendsCount) + 1.0),
 
       (firstFriendsCount + secondFriendsCount) * 5.0,
-      abs(firstFriendsCount * secondFriendsCount),
-      interactions,
-      Math.log(interactions + 1.0)
+      abs(firstFriendsCount * secondFriendsCount)
+      //interactions,
+      //Math.log(interactions + 1.0)
     )
 
   }

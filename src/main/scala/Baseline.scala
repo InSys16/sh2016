@@ -267,6 +267,7 @@ object Baseline {
             .filter(x => coreUsersBC.value.contains(x.uid) && userFriends.uid < x.uid)
             .map(x => (userFriends.uid, x.uid) -> 1.0)
         )
+    /*
     val interactions =
       sqlc.read.parquet(interactionsPath)
         .map((row: Row) => (row.getAs[Long](0), row.getAs[Long](1), row.getAs[Seq[Row]](2).map{
@@ -278,6 +279,7 @@ object Baseline {
         .map(x => (x._1.toInt, x._2.toInt) -> Interactions.calculateInteractions(x._3))
 
     val interactionsBC = sc.broadcast(interactions.collectAsMap())
+    */
     val pairsForLearning = IO.readPairs(sqlc, pairsPath + "/part_33")
 
 
@@ -299,7 +301,7 @@ object Baseline {
 
     def prepareData( pairs: RDD[Pair], positives: RDD[((Int, Int), Double)]) = {
       pairs
-        .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC, interactionsBC))
+        .map(pair => FeatureExtractor.getFeatures(pair, demographyBC, friendsCountBC, regionsProximityBC))//, interactionsBC))
         .leftOuterJoin(positives)
     }
 
@@ -357,7 +359,23 @@ object Baseline {
     //val rocLogReg = metricsLogReg.areaUnderROC()
     //println("model ROC = " + rocLogReg.toString)
 
-    // compute scores on the test set
+
+    val totalFriendCount =
+      mainUsersFriendsCount
+      .map(x => x._2)
+      .reduce(_+_)
+
+    val expectedCandidateCount = graph
+      .map(uf => {
+        val friendCount = uf.friends.length
+        val candidateCount = (4000000.0 * friendCount.toDouble / totalFriendCount.toDouble).toInt
+
+        uf.uid -> candidateCount
+      })
+
+    val expCandidateCountBC = sc.broadcast(expectedCandidateCount.collectAsMap())
+
+
     val testCommonFriendsCounts = {
       IO.readPairs(sqlc, pairsPath + "/part_*/")
         .filter(pair => pair.uid1 % 11 == 7 || pair.uid2 % 11 == 7)
@@ -375,9 +393,22 @@ object Baseline {
       .groupByKey(numGraphParts)
 
       .map(t => {
+        /*
         val user = t._1
         val friendsWithRatings = t._2.toList
         val topBestFriends = friendsWithRatings.sortBy(-_._2).take(100).map(x => x._1)
+        (user, topBestFriends)
+        */
+        val user = t._1
+        val friendsWithRatings = t._2.toList.sortBy(-_._2)
+
+        val availableCount = friendsWithRatings.length
+        val expectedCount = expCandidateCountBC.value.getOrElse(user, 1000)
+
+        var candidateCount = Math.max(25, Math.min(108, expectedCount))
+        candidateCount = Math.min(availableCount, candidateCount)
+
+        val topBestFriends = friendsWithRatings.take(candidateCount).map(x => x._1)
         (user, topBestFriends)
       })
       .sortByKey(true, 1)
