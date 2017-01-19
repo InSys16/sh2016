@@ -56,14 +56,7 @@ object Baseline {
     val numGraphParts = 200
     val numPairsParts = 107
 
-    // read graph, flat and reverse it
-    // step 1.a from description
 
-    /**
-      * list of [User * Friends[]]
-      */
-    
-    }
     /*
     def calculateRegionsProximity() = {
       val x =
@@ -146,6 +139,7 @@ object Baseline {
           }
           UserFriends(user, friends)
         })
+
 
     val coreUsers = graph.map(user => user.uid)
     val coreUsersBC = sc.broadcast(coreUsers.collect().toSet)
