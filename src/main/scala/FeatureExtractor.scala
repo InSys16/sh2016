@@ -43,7 +43,10 @@ object FeatureExtractor {
     val cosine  = countCosine(firstFriendsCount, secondFriendsCount, features.commonFriendsCount)
     val sameGender = if (firstDemography.gender == secondDemography.gender) 1.0 else 0.0
     val ageDiff = abs(firstDemography.age - secondDemography.age).toDouble
-    val regionProximity = regionsProximityBC.value.getOrElse((pair.uid1, pair.uid2), 0)
+    val ageMean = (firstDemography.age + secondDemography.age) * 0.5
+
+    val orderedPair = if (pair.uid1 < pair.uid2) (pair.uid1, pair.uid2) else (pair.uid2, pair.uid1)
+    val regionProximity = regionsProximityBC.value.getOrElse(orderedPair, 0)
     val positionProximity =
       if ((firstDemography.country == secondDemography.country) && (firstDemography.country != 0)) 1.0 else
         if (regionProximity >= 50000) 0.5 else 0.0
@@ -80,7 +83,8 @@ object FeatureExtractor {
 
       isEqL(firstDemography.country,secondDemography.country),
       isEq(firstDemography.loginRegion,secondDemography.loginRegion),
-      regDiff
+      regDiff,
+      ageMean
       //interactions,
       //Math.log(interactions + 1.0)
     )
