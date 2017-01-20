@@ -391,14 +391,15 @@ object Baseline {
     }
 
     def sumFeatures(features: org.apache.spark.mllib.linalg.Vector) = {
-      val res = Array(0.0,0.0,0.0)
+      val res = Array(0.0,0.0,0.0, 0.0)
 
       features.foreachActive((i, v) => res(i) = v)
-      (res(0), res(1), res(2))
+      (res(0), res(1), res(2), res(3))
     }
     var min0 = 4000000.0
     var min1 = 4000000.0
     var min2 = 4000000.0
+    var min3 = 4000000.0
 
     prepareData(pairsForPrediction, positives)
       .map(pair => pair._1 -> LabeledPoint(pair._2._2.getOrElse(0.0), pair._2._1))
@@ -408,12 +409,13 @@ object Baseline {
           min0 = Math.min(min0, prediction._1)
           min1 = Math.min(min1, prediction._2)
           min2 = Math.min(min2, prediction._3)
-          Seq.empty[(Int, (Int, (Double, Double, Double)))]
+          min3 = Math.min(min3, prediction._4)
+          Seq.empty[(Int, (Int, (Double, Double, Double, Double)))]
         }
         else
           Seq(pair._1 -> (pair._2, prediction), pair._2 -> (pair._1, prediction))
       }
-      .filter(t => t._1 % 11 == 7 && t._2._2._1 >= min0 && t._2._2._2 >= min1 && t._2._2._3 >= min2) //10)//threshold)
+      .filter(t => t._1 % 11 == 7 && t._2._2._1 >= min0 && t._2._2._2 >= min1 && t._2._2._3 >= min2 && t._2._2._4 >= min3) //10)//threshold)
       .groupByKey(numGraphParts)
 
 
@@ -421,7 +423,7 @@ object Baseline {
 
         val user = t._1
         val friendsWithRatings = t._2.toList
-        val topBestFriends = friendsWithRatings.sortBy(x => x._2._1 * 10000.0 + x._2._2 * 100.0 + x._2._3).take(100).map(x => x._1)
+        val topBestFriends = friendsWithRatings.sortBy(x => x._2._1 * 10000.0 + x._2._2 * 1000.0 + x._2._3 * 100 + x._2._4).take(100).map(x => x._1)
         (user, topBestFriends)
 
         /*
