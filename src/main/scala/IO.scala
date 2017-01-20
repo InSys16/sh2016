@@ -1,16 +1,4 @@
-import breeze.numerics.abs
-import org.apache.hadoop.io.compress.GzipCodec
-import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
-import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.mllib.regression.LabeledPoint
-import org.apache.spark.rdd.RDD
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.{Row, SQLContext, DataFrame}
-
-import scala.collection.Map
-import scala.collection.mutable.ArrayBuffer
+import org.apache.spark.sql.{Row, SQLContext}
 
 /**
   * Created by Artem Gorokhov on 1/15/2017.

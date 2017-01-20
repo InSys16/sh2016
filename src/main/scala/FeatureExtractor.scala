@@ -1,10 +1,3 @@
-import breeze.numerics.abs
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.rdd.RDD
-
-import org.apache.spark
-
 /**
   * Created by art on 14.01.17.
   */

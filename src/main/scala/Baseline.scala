@@ -1,25 +1,8 @@
-/**
-  * Baseline for hackaton
-  */
-
-import org.apache.spark.mllib.tree.configuration.Strategy
-import org.apache.spark.mllib.tree.RandomForest
-import org.apache.spark.mllib.tree.model.RandomForestModel
-import org.apache.spark.mllib.util.MLUtils
-import breeze.numerics.abs
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.ml.classification.RandomForestClassificationModel
-import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS}
-import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.sql.{Row, SQLContext}
-import org.apache.spark.graphx
-import org.apache.spark.graphx.{Edge, Graph}
-import org.apache.spark.graphx.lib.PageRank
+import org.apache.spark.sql.SQLContext
 
 import scala.collection.Map
 import scala.collection.mutable.ArrayBuffer
