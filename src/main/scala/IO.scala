@@ -24,25 +24,11 @@ object IO {
         .map{
           case Row(uid1: Int,
                    uid2: Int,
-                   adamicAdar : Double,
                    commonFriendsCount : Int,
-                   fedorScore : Double,
-                   //pageRank : Double,
-                   commonRelatives: Int,
-                   commonColleagues: Int,
-                   commonSchoolmates: Int,
-                   commonArmyFellows: Int,
-                   commonFriends: Int ) =>
+                   fedorScore : Double) =>
             Pair(uid1, uid2, Features(
-              adamicAdar,
               commonFriendsCount,
-              fedorScore,
-              //pageRank,
-              GroupScores(commonRelatives,
-                          commonColleagues,
-                          commonSchoolmates,
-                          commonArmyFellows,
-                          commonFriends)
+              fedorScore
             ))}
   }
 
@@ -53,7 +39,7 @@ object IO {
         val user = r.getAs[Int](0)
         val friends =
           r.getAs[Seq[Row]](1)
-            .map { case Row(uid: Int, mask: Int) => GraphFriend(uid, mask) }
+            .map { case Row(uid: Int) => GraphFriend(uid) }
             .toArray
         UserFriends(user, friends)
       })
